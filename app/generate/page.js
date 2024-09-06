@@ -1,13 +1,52 @@
 "use client"
 import React, { useState, useEffect } from "react"
 import { useUser, UserButton } from "@clerk/nextjs"
-import { redirect } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Music, Headphones, PlayCircle, X } from "lucide-react"
-import { getAlbumArtwork } from "../utils/spotifyApi"
+import { Music, PlayCircle, X } from "lucide-react"
+
+function AlbumArtWork({ artist, song }) {
+  const [artworkUrl, setArtworkUrl] = useState(null);
+  const [status, setStatus] = useState('loading');
+
+  useEffect(() => {
+    async function fetchArtwork() {
+      if (!artist || !song) {
+        setStatus('not found');
+        return;
+      }
+      setStatus('loading');
+      try {
+        const response = await fetch(`/api/getAlbumArtwork?artist=${encodeURIComponent(artist)}&song=${encodeURIComponent(song)}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.url) {
+          setArtworkUrl(data.url);
+          setStatus('loaded');
+        } else {
+          setStatus('not found');
+        }
+      } catch (error) {
+        console.error('Error fetching artwork:', error);
+        setStatus('error');
+      }
+    }
+
+    fetchArtwork();
+  }, [artist, song]);
+
+  if (status === 'loading') return <p>Loading artwork...</p>;
+  if (status === 'error') return <p>Error loading artwork</p>;
+  if (status === 'not found') return <p>No artwork found</p>;
+  return <img src={artworkUrl} alt="Album Artwork" className="w-full h-full object-cover" />;
+}
+
 
 export default function Generate() {
   const { isLoaded, isSignedIn, user } = useUser()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("song")
   const [songs, setSongs] = useState(["", "", "", "", ""])
   const [artists, setArtists] = useState(["", "", "", "", ""])
@@ -17,16 +56,20 @@ export default function Generate() {
 
   useEffect(() => {
     // Load history from localStorage
-    const savedHistory = localStorage.getItem("recommendationHistory")
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory))
+    if (typeof window !== 'undefined') {
+      const savedHistory = localStorage.getItem("recommendationHistory")
+      if (savedHistory) {
+        setHistory(JSON.parse(savedHistory))
+      }
     }
   }, [])
 
   // Redirect if not signed in
-  if (isLoaded && !isSignedIn) {
-    redirect("/sign-in")
-  }
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push("/sign-in")
+    }
+  }, [isLoaded, isSignedIn, router])
 
   const handleSongChange = (index, value) => {
     const newSongs = [...songs]
@@ -66,6 +109,9 @@ export default function Generate() {
         },
         body: JSON.stringify(payload),
       })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const data = await response.json()
       setResult(data)
 
@@ -75,7 +121,9 @@ export default function Generate() {
         ...history.slice(0, 4),
       ]
       setHistory(newHistory)
-      localStorage.setItem("recommendationHistory", JSON.stringify(newHistory))
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("recommendationHistory", JSON.stringify(newHistory))
+      }
     } catch (error) {
       console.error("Error:", error)
       setResult({
@@ -105,8 +153,7 @@ export default function Generate() {
             Music Bot
           </Link>
           <div className="flex items-center space-x-4">
-            <span>Welcome, {user.firstName}!</span>
-            {/* <img src={user.profileImageUrl} alt="Profile" className="w-10 h-10 rounded-full" /> */}
+            <span>Welcome, {user?.firstName || 'User'}!</span>
             <UserButton />
           </div>
         </div>
@@ -220,19 +267,25 @@ export default function Generate() {
             {result.error ? (
               <p className="text-red-400">{result.error}</p>
             ) : (
-              <ul className="list-disc list-inside">
+              <ul className="space-y-4">
                 {result.map((item, index) => (
-                  <li key={index} className="mb-2 flex items-center">
-                    <Music className="mr-2" />
-                    <span className="font-semibold">{item.name}</span> by{" "}
-                    <span className="italic ml-1">{item.artist}</span>
+                  <li key={index} className="flex items-center space-x-4">
+                    <div className="w-16 h-16 flex-shrink-0">
+                      <AlbumArtWork artist={item.artist} song={item.name} />
+                    </div>
+                    <div className="flex-grow">
+                      <div className="flex items-center">
+                        <Music className="mr-2" />
+                        <span className="font-semibold">{item.name}</span>
+                      </div>
+                      <div className="italic ml-6">by {item.artist}</div>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
           </div>
         )}
-
         {/* History */}
         {history.length > 0 && (
           <div className="mt-8">
