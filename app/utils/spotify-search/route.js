@@ -2,7 +2,7 @@ import fetch from "node-fetch"
 
 async function getAccessToken() {
   try {
-    const response = await fetch("http://localhost:3000/utils/spotify-token")
+    const response = await fetch("https://music-rec-bot.vercel.app/utils/spotify-token")
     if (!response.ok) {
       throw new Error("Failed to fetch access token")
     }
