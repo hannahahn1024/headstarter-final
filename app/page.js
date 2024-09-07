@@ -169,7 +169,7 @@ export default function Home() {
                   Easy Input
                 </p>
                 <p className="mt-2 ml-16 text-base text-gray-300">
-                  Simply input your favorite songs and artists. It`s as easy as
+                  Simply input your favorite songs and artists. It&apos;s as easy as
                   1, 2, 3 with our intuitive interface.
                 </p>
               </div>
